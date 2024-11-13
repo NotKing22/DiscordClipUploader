@@ -20,7 +20,7 @@ class DiscordClipUploader:
         self.root.configure(bg="#36393F")
         
         # Caminho do .ico no titulo
-        self.root.iconbitmap('C:/Users/mathe/Desktop/discordclipuploader-main/monkey.ico')
+        # self.root.iconbitmap('monkey.ico')
 
         self.file_path = ""
         self.upload_speed = tk.StringVar()
