@@ -1,9 +1,38 @@
 import os
-import base64
-
 from PIL import Image
 from moviepy.editor import VideoFileClip
 import requests
+
+def create_and_upload_thumbnail(video_path):
+    clip = VideoFileClip(video_path)
+    
+    frame = clip.get_frame(1.0)  # Primeiro segundo do clipe
+    
+    image = Image.fromarray(frame)
+    image_path = "thumbnail.jpg"
+    
+    # Salvar o thumbnail
+    image.save(image_path)
+
+    # Fechar explicitamente o arquivo para evitar problemas de "arquivo em uso"
+    image.close()
+    
+    # Garantir que o arquivo foi liberado antes de prosseguir
+    try:
+        with open(image_path, 'rb') as file:
+            files = {'files[]': file}
+            response = requests.post('https://up1.fileditch.com/upload.php', files=files)
+
+        if response.status_code == 200:
+            json_response = response.json()
+            image_url = json_response['files'][0]['url']
+            os.remove(image_path)  # Deletar o arquivo após o upload
+            return image_url
+        else:
+            raise Exception("Failed to upload thumbnail. Status code: " + str(response.status_code))
+    except Exception as e:
+        os.remove(image_path)  # Garantir que o arquivo seja deletado em caso de erro
+        raise e  
 
 def get_video_info_and_shortlink(video_url, filepath):
     info_url = "https://autocompressor.net/videoinfo"
@@ -33,7 +62,10 @@ def get_video_info_and_shortlink(video_url, filepath):
     data["v"] = video_url
 
     try:
-        data["i"] = create_and_upload_thumbnail(filepath)
+        # Gerar o thumbnail e obter a URL
+        thumbnail_url = create_and_upload_thumbnail(filepath)
+        if thumbnail_url:
+            data["i"] = thumbnail_url
     except Exception as e:
         print("Error creating and uploading thumbnail:", e)
 
@@ -41,22 +73,3 @@ def get_video_info_and_shortlink(video_url, filepath):
     shortlink_json = response.json()
 
     return "https://autocompressor.net/av1?s=" + shortlink_json["shortLink"]
-
-def create_and_upload_thumbnail(video_path):
-    clip = VideoFileClip(video_path)
-    frame = clip.get_frame(clip.duration / 2.0)
-    image = Image.fromarray(frame)
-    image_path = "thumbnail.jpg"
-    image.save(image_path)
-
-    url = 'https://up1.fileditch.com/upload.php'
-    files = {'files[]': open(image_path, 'rb')}
-    response = requests.post(url, files=files)
-
-    if response.status_code == 200:
-        json_response = response.json()
-        image_url = json_response['files'][0]['url']
-        return image_url
-    else:
-        raise Exception("Failed to upload thumbnail. Status code: " + str(response.status_code))
-

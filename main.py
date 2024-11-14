@@ -11,6 +11,13 @@ import requests
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
 from utils import get_video_info_and_shortlink
+import sys
+import os
+
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 class DiscordClipUploader:
     def __init__(self, root):
@@ -18,9 +25,9 @@ class DiscordClipUploader:
         self.root.title("Discord clip uploader v2.0")
         self.root.geometry("500x580")
         self.root.configure(bg="#36393F")
-        
-        # Caminho do .ico no titulo
-        self.root.iconbitmap('C:/Users/mathe/Desktop/discordclipuploader-main/monkey.ico')
+
+        # Caminho do .ico no titulo usando resource_path
+        self.root.iconbitmap(resource_path('monkey.ico'))
 
         self.file_path = ""
         self.upload_speed = tk.StringVar()
@@ -30,17 +37,12 @@ class DiscordClipUploader:
         self.label = tk.Label(self.root, text="Nome do Clip:", bg="#36393F", fg="white")
         self.label.pack(pady=10)
 
-        # Alterando cor do texto para melhorar a visibilidade
         self.text_field = Entry(self.root, width=30, bg="white", fg="black")  # Alterado de #36393F para black
         self.text_field.pack(pady=3)
 
         # Botão de seleção de nome do clip
         self.btn_select_name = tk.Button(self.root, text="Nome Automático", command=self.set_clip_name, bg="#7289DA", fg="white")
-        self.btn_select_name.pack(pady=3)
-
-        # Botão "Clipe sem nome"
-        self.btn_no_name_clip = tk.Button(self.root, text="Clipe sem nome", command=self.set_no_name_clip, bg="#7289DA", fg="white")
-        self.btn_no_name_clip.pack(pady=3)
+        self.btn_select_name.pack(pady=10)
 
         self.frame = LabelFrame(self.root, text="Arraste e solte os arquivos aqui", width=400, height=200, bg="#2C2F33", fg="white")
         self.frame.pack(pady=15)
@@ -79,9 +81,9 @@ class DiscordClipUploader:
             messagebox.showerror("Erro", "Por favor, selecione um arquivo primeiro")
             return
 
+        # Se o nome do clip estiver vazio, atribuir "⠀" (nome sem texto visivel)
         if not self.text_field.get():
-            messagebox.showerror("Erro", "Por favor, insira um nome para o clip")
-            return
+            self.text_field.insert(0, "⠀")
 
         self.clear_progress_elements()
 
@@ -93,9 +95,10 @@ class DiscordClipUploader:
         self.lbl_eta = tk.Label(self.root, textvariable=self.eta, bg="#36393F", fg="white")
         self.lbl_eta.pack()
 
-        # Desabilitar o campo de nome e botões de upload durante o upload
+        # Desabilitar o campo de nome botões de upload e "Nome Automático" durante o upload
         self.text_field.config(state='disabled')
         self.btn_upload.config(state='disabled')
+        self.btn_select_name.config(state='disabled')  # Desabilitar o botão "Nome Automático"
 
         # Exibir o botão de cancelar upload
         self.btn_cancel_upload.pack()  # Exibir o botão
@@ -147,25 +150,20 @@ class DiscordClipUploader:
                     pyperclip.copy(tocopy)
                     messagebox.showinfo("Sucesso!", "O link do clip foi copiado para a área de transferência! Você pode enviá-lo no Discord.")
                 except ValueError as ve:
-                    # Captura erros ao tentar converter a resposta para JSON
                     messagebox.showerror("Erro", f"Falha no upload!\nResposta inesperada do servidor (não é JSON): {response.text}\nErro: {ve}")
                 except KeyError as ke:
-                    # Captura erros ao tentar acessar campos que não existem no JSON
                     messagebox.showerror("Erro", f"Falha no upload!\nFormato de resposta inválido: {response.json()}\nErro: {ke}")
             else:
-                # Adicionando detalhes da resposta do servidor
                 messagebox.showerror("Erro", f"Falha no upload!\nCódigo de status: {response.status_code}\nResposta do servidor: {response.text}")
         except requests.RequestException as re:
-            # Captura erros relacionados à requisição HTTP
             messagebox.showerror("Erro", f"Falha na requisição!\nErro: {str(re)}")
         except Exception as e:
             if str(e) == "Upload cancelado":
                 messagebox.showinfo("Cancelado", "O upload foi cancelado com sucesso!")
             else:
-                # Exibe o tipo e a mensagem completa do erro
                 messagebox.showerror("Erro", f"Falha no upload!\nTipo de erro: {type(e).__name__}\nErro: {str(e)}")
 
-        # Resetar os componentes após o upload/cancelamento
+        # Restabelecer o estado dos botões e do campo de texto ao finalizar o upload
         self.progress['value'] = 0
         self.upload_speed.set("")
         self.eta.set("")
@@ -174,7 +172,8 @@ class DiscordClipUploader:
         self.text_field.config(state='normal')
         self.text_field.delete(0, END)
         self.btn_upload.config(state='normal')
-        self.btn_cancel_upload.pack_forget()  # Ocultar o botão após o upload
+        self.btn_select_name.config(state='normal')  # Restaura o state do botão "Nome Automático"
+        self.btn_cancel_upload.pack_forget()  # Ocultar o botão após inicio do upload
 
     def cancel_upload(self):
         self.cancel_upload_event.set()
@@ -186,10 +185,6 @@ class DiscordClipUploader:
             self.text_field.insert(0, clip_name)
         else:
             self.text_field.delete(0, END)
-
-    def set_no_name_clip(self):
-        self.text_field.delete(0, END)
-        self.text_field.insert(0, "⠀")
 
     def drop(self, event):
         if event.data.startswith('{'):
